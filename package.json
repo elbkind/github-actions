@@ -1,0 +1,24 @@
+{
+	"name": "github-actions",
+	"version": "1.0.0",
+	"description": "Test github actions pipelines",
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "tsc --project tsconfig.json",
+		"verify:lint": " git log --oneline -1 --format=%s ${GIT_COMMIT_SHA} | npx commitlint",
+		"lint": "npm run verify:lint && npm run verify:format",
+		"verify:format": "prettier --list-different '**/*.{ts,md,json}'",
+		"test": "jest"
+	},
+	"author": "mark.vollmann@elbkind.eu",
+	"license": "MIT",
+	"dependencies": {},
+	"devDependencies": {
+		"@commitlint/cli": "^8.2.0",
+		"@commitlint/config-conventional": "^8.2.0",
+		"jest": "^24.9.0",
+		"prettier": "^1.19.1",
+		"ts-jest": "^24.2.0",
+		"typescript": "^3.7.2"
+	}
+}
