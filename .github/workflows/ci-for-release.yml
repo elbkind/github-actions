@@ -37,3 +37,7 @@ jobs:
 
       - name: print the version tag
         run: echo version is ${{ steps.get_version.outputs.VERSION }}
+
+      - name: run script printing the version tag
+        run: |
+          sh ./scripts/deploy-to-s3.sh ${{ steps.get_version.outputs.VERSION }}
