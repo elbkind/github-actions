@@ -1,0 +1,39 @@
+name: CI for branches
+
+on:
+  push:
+    tags:
+      - 'release/v**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [10.x]
+
+    env:
+      GIT_COMMIT_SHA: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://npm.pkg.github.com
+
+      - name: install dependencies
+        uses: bahmutov/npm-install@v1
+
+      - name: build
+        run: npm run build
+
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\/release\//}
+
+      - name: print the version tag
+        run: echo version is ${{ steps.get_version.outputs.VERSION }}
