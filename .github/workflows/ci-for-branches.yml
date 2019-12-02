@@ -1,0 +1,64 @@
+name: CI for branches
+
+on:
+  push:
+    branches-ignore:
+      - master
+      - release/**
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [10.x]
+
+    env:
+      GIT_COMMIT_SHA: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://npm.pkg.github.com
+
+      - name: install dependencies
+        uses: bahmutov/npm-install@v1
+
+      - name: build
+        run: npm run build
+
+      - name: test
+        run: npm test
+
+  lint:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [10.x]
+
+    env:
+      GIT_COMMIT_SHA: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://npm.pkg.github.com
+
+      - name: install dependencies
+        uses: bahmutov/npm-install@v1
+
+      - name: validate commits
+        run: git log --oneline -1 --format=%s ${GIT_COMMIT_SHA} | yarn commitlint
+
+      - name: lint
+        run: npm run lint
