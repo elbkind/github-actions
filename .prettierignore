@@ -1,0 +1,7 @@
+CHANGELOG.md
+dist/
+node_modules/
+package.json
+.vscode/
+.idea/
+package-lock.json
