@@ -1,0 +1,78 @@
+name: Pull Request Review
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  pull-request-review:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+
+    steps:
+      - name: dummyStepToPreventFailureForReviewComments
+        run: echo event for review messages
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        if: github.event.review.body == 'prerelease'
+        uses: actions/checkout@v1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        if: github.event.review.body == 'prerelease'
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://npm.pkg.github.com
+          scope: '@volkswagen-onehub'
+
+      - name: install dependencies
+        if: github.event.review.body == 'prerelease'
+        uses: bahmutov/npm-install@v1
+
+      - name: build
+        if: github.event.review.body == 'prerelease'
+        run: yarn build
+
+      - name: publish to github
+        if: github.event.review.body == 'prerelease'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          GIT_COMMIT_SHA_SHORT=$(echo ${GIT_COMMIT_SHA} | cut -c1-8)
+          yarn lerna publish --canary --exact --dist-tag alpha --preid alpha-${GIT_COMMIT_SHA_SHORT} --yes --no-verify-access
+
+      - name: publish to s2 nexus
+        if: github.event.review.body == 'prerelease'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.S2_NEXUS_TOKEN }}
+        run: |
+          GIT_COMMIT_SHA_SHORT=$(echo ${GIT_COMMIT_SHA} | cut -c1-8)
+          git checkout .
+          echo "@volkswagen-onehub:registry=https://repo.sinnerschrader.com/repository/vwa-npm-github-mirror-hosted/" >> .npmrc
+          git update-index --assume-unchanged .npmrc
+          npm config set '//repo.sinnerschrader.com/repository/vwa-npm-github-mirror-hosted/:_authToken=${NODE_AUTH_TOKEN}'
+          npm config set '@volkswagen-onehub:registry=https://repo.sinnerschrader.com/repository/vwa-npm-github-mirror-hosted/'
+          lernalog=$(yarn lerna publish --canary --exact --dist-tag alpha --preid alpha-${GIT_COMMIT_SHA_SHORT} --yes --no-verify-access --registry https://repo.sinnerschrader.com/repository/vwa-npm-github-mirror-hosted/ | tr '\n' ' ')
+          echo "::set-env name=publish_output::$lernalog"
+
+      - name: Create commit comment
+        if: github.event.review.body == 'prerelease'
+        uses: actions/github-script@0.3.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            if (process.env.publish_output.includes('Successfully published')) {
+              github.repos.createCommitComment({...context.repo, commit_sha: process.env.GITHUB_SHA, body: `New Prereleases published: ${process.env.publish_output.match(/Successfully published:(.*)Done/)[1].replace('Successfully published:', '').replace(/Done.*/g, '').replace(/\s-\s/g, '\n- ')}`})
+            } else {
+              github.repos.createCommitComment({...context.repo, commit_sha: process.env.GITHUB_SHA, body: 'No changed packages to publish as prerelease'})
+            }
+
+      - name: Add PR Comment
+        if: github.event.review.body == 'prerelease'
+        uses: actions/github-script@0.3.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const {pull_request, repository} = context.payload;
+            const commentBody = `Prelease created`;
+            github.issues.createComment({owner: repository.owner.login, repo: repository.name, issue_number: pull_request.number, body: commentBody});

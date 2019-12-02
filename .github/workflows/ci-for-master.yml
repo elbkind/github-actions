@@ -1,0 +1,61 @@
+name: CI for master
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [10.x]
+
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          ref: master
+      - name: checkout master
+        run: git checkout master
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://npm.pkg.github.com
+          scope: '@volkswagen-onehub'
+      - name: install dependencies
+        uses: bahmutov/npm-install@v1
+      - name: build
+        run: yarn build
+      - name: build:dist
+        run: yarn build:dist
+      - name: increase version
+        run: |
+          git config --local user.email "vwa-ihdcc-team@sinnerschrader.com"
+          git config --local user.name "(TECHNICAL VWA) VWA"
+          yarn lerna version --conventional-commits --yes --no-push
+          git diff origin/master..HEAD --quiet || echo "::set-env name=has_changes::'yes'"
+      - name: Push release commit
+        if: env.has_changes
+        uses: ad-m/github-push-action@v0.5.0
+        with:
+          github_token: ${{ secrets.TECHNICAL_VWA_USER_GITHUB_TOKEN }}
+          branch: 'master'
+      - name: publish to github
+        if: env.has_changes
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: yarn lerna publish from-git --yes --no-verify-access
+      - name: publish to s2 nexus
+        if: env.has_changes
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.S2_NEXUS_TOKEN }}
+        run: |
+          git checkout .
+          echo "@volkswagen-onehub:registry=https://repo.sinnerschrader.com/repository/vwa-npm-github-mirror-hosted/" >> .npmrc
+          git update-index --assume-unchanged .npmrc
+          npm config set '//repo.sinnerschrader.com/repository/vwa-npm-github-mirror-hosted/:_authToken=${NODE_AUTH_TOKEN}'
+          npm config set '@volkswagen-onehub:registry=https://repo.sinnerschrader.com/repository/vwa-npm-github-mirror-hosted/'
+          yarn lerna publish from-git --yes --no-verify-access --registry https://repo.sinnerschrader.com/repository/vwa-npm-github-mirror-hosted/
